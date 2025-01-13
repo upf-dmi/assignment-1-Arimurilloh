@@ -1,6 +1,6 @@
 ---
 title: "my title"
-author: "Dummy Surname (dummy@mail.com)"
+author: "Ariana Murillo"
 date: "Last update: `r format(Sys.time(), '%d %B, %Y')`"      
 output:
   html_document:
