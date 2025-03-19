@@ -22,6 +22,8 @@ In this session, the main aim is to perform two of the commonly executed steps i
 
 ```{r}
 #Loads the needed libraries:
+library(here)
+library(readxl)
 
 # For Ex 1:
 library(tidyverse)
@@ -52,8 +54,6 @@ library(circlize)
 set.seed(123) # Set seed for reproducibility
 
 ```
-
-
 # Exercise 1: Analysis of the Heart Disease Dataset 
 Load the data from
 [here](https://raw.githubusercontent.com/jpinero/DMI_2021/main/datasets/heart_disease_dataset.csv), and the description is [here](https://raw.githubusercontent.com/jpinero/DMI_2021/main/datasets/heart_disease_description.txt). 
@@ -69,7 +69,7 @@ Then, we perform a first glance to the dataset with `str()`, in which we see all
 
 ```{r}
 # Read file with correct delimiter (spaces)
-heart_data <- read.csv("C:/Users/arian/Documents/GitHub/assignment-1-Arimurilloh/data/heart_disease_dataset.csv", sep = " ", header = TRUE, na.strings = c("?"))
+heart_data <- read.csv(file.path("data", "heart_disease_dataset.csv"), sep = " ", header = TRUE, na.strings = c("?"))
 heart_data <- heart_data[,1:14] #Remove ID column
 
 # Check the loaded columns
@@ -343,7 +343,7 @@ We are asked to reproduce the following figure from the proposed article:
 ![Original Figure 1](https://www.frontiersin.org/files/Articles/987182/fmed-09-987182-HTML/image_m/fmed-09-987182-g001.jpg)
 
 ```{r}
-data <- read_excel("C:/Users/arian/Documents/GitHub/assignment-1-Arimurilloh/data/data_covid19.XLSX", col_names = TRUE) #Load data
+data <- read_excel(file.path("data", "data_covid19.XLSX"), col_names = TRUE)
 
 #We change names to more accessible ones
 setnames(data, 
@@ -505,40 +505,71 @@ We are asked to reproduce the following figure from the proposed article:
 Firstly, we read and pre-process the data (renaming columns and filling missing data, IDs in this case as only appears for the first occurrence on each patient).
 
 ```{r}
-# Read excel:
-df <- read_excel("C:/Users/arian/Documents/GitHub/assignment-1-Arimurilloh/data/data2_covid19.XLSX", col_names = TRUE, na=c("NI", "ND"), skip = 1) #skip 1st line (not header)
+# Load necessary libraries
+library(readxl)
+library(dplyr)
+library(stringr)
+library(janitor)  # For cleaning column names
 
-colnames(df)[1:2] <- c("ID", "Day") # Rename first two columns for clarity
-df$ID <- str_extract(df$ID, "\\d+$")  # Extract only numbers from Patient_ID
+# Define the relative path of the file
+file_path <- file.path("data", "data2_covid19.XLSX")
 
-# Fill missing Patient_ID values downwards
-df <- df %>%
-  fill(ID, .direction = "down")
+# Check if the file exists before reading it
+if (file.exists(file_path)) {
+  
+  # Read the Excel file, skipping the first row
+  df <- read_excel(file_path, col_names = TRUE, na = c("NI", "ND"), skip = 1)
+  
+  # Clean column names to ensure they are valid in R
+  df <- clean_names(df)  
+  
+  # Ensure at least two columns exist before renaming
+  if (ncol(df) >= 2) {
+    colnames(df)[1:2] <- c("ID", "Day")
+  } else {
+    stop("The dataset has fewer than 2 columns. Please check the data file.")
+  }
+  
+  # Extract only numbers from Patient_ID, handling potential missing values
+  df <- df %>%
+    mutate(ID = str_extract(ID, "\\d+$")) %>%
+    fill(ID, .direction = "down")  # Fill missing Patient_ID values downward
+  
+} else {
+  stop(paste("File not found:", file_path))
+}
+
+# Display the first few rows of the dataframe
+head(df)
+
 ```
 
 Besides, we select only the columns corresponding to cytokines. There, as we have multiple temporal registers for each patient, we take the median value of the timeseries as an approximation. Next, as we will need it following, we also add clinical data (Group, Gender, Vital Status) to the cytokine values. Finally, we scale (to make them comparable) and transpose (to match the Heatmap requirements) the cytokine data, and remove the nan values.
 
 ```{r}
-cytokine_cols <- colnames(df)[3:14]  # Select only cytokine-related columns
-df[cytokine_cols] <- lapply(df[cytokine_cols], as.numeric) # Convert numeric columns
+# Select only cytokine-related columns
+cytokine_cols <- colnames(df)[3:14]  
 
-# Compute median per patient across time points
+# Convert selected columns to numeric
+df[cytokine_cols] <- lapply(df[cytokine_cols], as.numeric) 
+
+# Compute median per patient across time points (corrected syntax for `across()`)
 df_median <- df %>%
   group_by(ID) %>%
-  summarise(across(all_of(cytokine_cols), median, na.rm = TRUE))  # Median ignoring NA
+  summarise(across(all_of(cytokine_cols), \(x) median(x, na.rm = TRUE)))  # Corrected function
 
-#Builds clinical info dataframe
+# Build clinical info dataframe
 df_ex1 <- data.frame(ID = data$ID, Group = group_vect, Gender = data$Gender, Status = data$Death)
 df_ex1 <- distinct(df_ex1, ID, .keep_all = TRUE)
 df_ex1$ID <- str_extract(df_ex1$ID, "\\d+$")  # Keep only trailing numbers
 
-#Merges cytokine with clinical info
+# Merge cytokine data with clinical info
 df_median <- inner_join(df_ex1, df_median, by = "ID")
-df_median <- df_median[order(df_median$Group),] #We order by groups, so appear ordered in the annotation
+df_median <- df_median[order(df_median$Group),]  # Order by groups for proper annotation
 
-#Select only cytokine values (scaled) and remove nans (assign 0)
-cytokine_data <- t(scale(df_median[,5:16]))#*100/max(df_median[,3:14], na.rm=TRUE)
-cytokine_data[is.na(cytokine_data)] = 0 
+# Select only cytokine values (scaled) and remove NaNs (assign 0)
+cytokine_data <- t(scale(df_median[,5:16])) 
+cytokine_data[is.na(cytokine_data)] <- 0  # Replace NA values with 0
 ```
 
 Then, we are ready to build the Heatmap with `ComplexHeatmap` package. To do so, we assign colors for the groups and define the annotation that will go at the top, and finally introduce the cytokine matrix as the input to retrieve the Heatmap. Note that the Heatmap is not the same as the original for several reasons: firstly, they express the cytokine profiles in terms of a reference value, which we do not have at our disposal (we are expressing the scaled values, only); besides, we set the color scale approximately; finally, they sort the values by clusters: here we are doing it by groups, which explains a different distribution on the high/low values. In that sense, note that we also did not include the clustering of the columns, as this would disorder the samples by groups (clustering can be easily set as True as an argument of the plotting function).
