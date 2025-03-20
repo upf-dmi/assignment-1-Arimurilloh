@@ -26,8 +26,11 @@ jobs:
       - name: Check Hands_on_I.Rmd
         run: if (Test-Path Hands_on_I.Rmd) { exit 0 } else { Write-Host "Missing Hands_on_I.Rmd"; exit 1 }
 
-      - name: Install R packages
-        run: Rscript -e 'install.packages(c("here", "readxl", "tidyverse", "corrplot", "mlbench", "GGally", "dplyr", "tidyr", "ggplot2", "gtable", "data.table", "gridExtra", "grid", "patchwork", "stringr", "ComplexHeatmap", "circlize", "rmarkdown"), repos="http://cran.rstudio.com")'
+      - name: Install R and Bioconductor packages
+        run: Rscript -e '
+          if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager");
+          BiocManager::install(c("ComplexHeatmap", "circlize"));
+          install.packages(c("here", "readxl", "tidyverse", "corrplot", "mlbench", "GGally", "dplyr", "tidyr", "ggplot2", "gtable", "data.table", "gridExtra", "grid", "patchwork", "stringr", "rmarkdown"), repos="http://cran.rstudio.com")'
 
       - name: Render Hands_on_I.html
         run: Rscript -e 'rmarkdown::render("Hands_on_I.Rmd")'
