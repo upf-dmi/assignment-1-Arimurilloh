@@ -30,7 +30,7 @@ jobs:
         run: Rscript -e '
           if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager");
           BiocManager::install(c("ComplexHeatmap", "circlize"));
-          install.packages(c("here", "readxl", "tidyverse", "corrplot", "mlbench", "GGally", "dplyr", "tidyr", "ggplot2", "gtable", "data.table", "gridExtra", "grid", "patchwork", "stringr", "rmarkdown"), repos="http://cran.rstudio.com")'
+          install.packages(c("here", "readxl", "tidyverse", "corrplot", "mlbench", "GGally", "dplyr", "tidyr", "ggplot2", "gtable", "data.table", "gridExtra", "grid", "patchwork", "stringr", "rmarkdown", "janitor"), repos="http://cran.rstudio.com")'
 
       - name: Render Hands_on_I.html
         run: Rscript -e 'rmarkdown::render("Hands_on_I.Rmd")'
